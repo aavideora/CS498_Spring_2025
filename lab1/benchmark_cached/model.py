@@ -43,38 +43,38 @@ class CausalSelfAttention(nn.Module):
         B, T, C = x.size() # batch size, sequence length, embedding dimensionality (n_embd)
 
         # calculate query, key, values for all heads in batch.
-        q = torch.einsum('_, _ -> bsnh', x, self.w_q)
-        k = torch.einsum('_, _ -> bsnh', x, self.w_k)
-        v = torch.einsum('_, _ -> bsnh', x, self.w_v)
+        q = torch.einsum('bsc, cnh -> bsnh', x, self.w_q)
+        k = torch.einsum('bsc, cnh -> bsnh', x, self.w_k)
+        v = torch.einsum('bsc, cnh -> bsnh', x, self.w_v)
 
         if kvcache:
             prev_k, prev_v = kvcache
-            k = _
-            v = _
+            k = torch.cat((prev_k, k), dim=1)
+            v = torch.cat((prev_v, v), dim=1)
 
-        new_kvcache = _
-        curr_T = _
+        new_kvcache = (k,v)
+        curr_T = k.size(1)
 
         if kvcache:
-            att = torch.einsum('_, _ -> bnqk', q, k)
+            att = torch.einsum('bqnh, bknh -> bnqk', q, k)
             att = att / math.sqrt(k.size(-1))
             att = att.masked_fill(torch.ones_like(self.bias[:,:,:T,:curr_T]) == 0, float('-inf'))
             att = att.to(torch.float32)
             att = F.softmax(att, dim=-1)
             att = att.to(x.dtype)
             att = self.attn_dropout(att)
-            y = torch.einsum('_, _ -> bsnh', att, v)
+            y = torch.einsum('bnqk, bsnh -> bsnh', att, v)
         else:
             # manual implementation of attention
-            att = torch.einsum('_, _ -> bnqk', q, k)
+            att = torch.einsum('bqnh, bknh -> bnqk', q, k)
             att = att / math.sqrt(k.size(-1))
             att = att.masked_fill(self.bias[:,:,:T,:T] == 0, float('-inf'))
             att = att.to(torch.float32)
             att = F.softmax(att, dim=-1)
             att = att.to(x.dtype)
             att = self.attn_dropout(att)
-            y = torch.einsum('_, _ -> bsnh', att, v)
-        y = y.contiguous().view(_, _, _) # re-assemble all head outputs side by side
+            y = torch.einsum('bnqk, bsnh -> bsnh', att, v)
+        y = y.contiguous().view(B, T, self.n_embd) # re-assemble all head outputs side by side
 
         # output projection
         y = self.resid_dropout(self.c_proj(y))
