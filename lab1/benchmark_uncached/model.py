@@ -57,7 +57,7 @@ class CausalSelfAttention(nn.Module):
         att = self.attn_dropout(att)
         y = torch.einsum('bnqk, bsnh -> bsnh', att, v)
         ## Compute AV product.
-        y = y.contiguous().view(b, s, self.n_embd) # re-assemble all head outputs side by side
+        y = y.contiguous().view(B, T, self.n_embd) # re-assemble all head outputs side by side
 
         # output projection
         y = self.resid_dropout(self.c_proj(y))
