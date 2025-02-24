@@ -63,7 +63,7 @@ class CausalSelfAttention(nn.Module):
             att = F.softmax(att, dim=-1)
             att = att.to(x.dtype)
             att = self.attn_dropout(att)
-            y = torch.einsum('bnqk, bsnh -> bsnh', att, v)
+            y = torch.einsum('bnqk, bknh -> bqnh', att, v)
         else:
             # manual implementation of attention
             att = torch.einsum('bqnh, bknh -> bnqk', q, k)
